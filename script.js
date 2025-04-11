@@ -260,6 +260,9 @@ $(document).ready(function()
   }
 
   function createRoom(roomName, sensor1Id, sensor2Id) {
+    const password = prompt("Enter password to create room:");
+    if (password === null) return; // User cancelled 
+    
     console.log("Creating room:", roomName, sensor1Id, sensor2Id);
     $.ajax({
       url: "api.php?action=createRoom",
@@ -268,6 +271,7 @@ $(document).ready(function()
       data: JSON.stringify({
         room_name: roomName,
         sensor_ids: [sensor1Id, sensor2Id],
+        password: password // send password to server
       }),
       success: function(response) {
         console.log("Create room response:", response);
@@ -305,16 +309,18 @@ $(document).ready(function()
       alert("Error: Room name not found.");
       return;
     }
+    
   
     if (!confirm(`Are you sure you want to delete the room "${roomName}"?`)) {
       return;
+
     }
   
     $.ajax({
       url: "api.php?action=deleteRoom",
       method: "POST",
       contentType: "application/json",
-      data: JSON.stringify({ room_id: roomId, room_name : roomName }),  // Make sure you're passing room_id
+      data: JSON.stringify({ room_id: roomId, room_name : roomName, }),  // Make sure you're passing room_id
       success: function(response) {
         console.log(response);  // Log the response for debugging
         alert(response.message);  // Show response message  
