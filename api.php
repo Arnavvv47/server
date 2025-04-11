@@ -20,6 +20,13 @@ function createRoom() {
     global $conn;
     $data = json_decode(file_get_contents('php://input'), true);
 
+    $correctPassword = "admin123"; // You can replace this with a config/env variable
+
+    if (!isset($data['password']) || $data['password'] !== $correctPassword) {
+        echo json_encode(['status' => 'error', 'message' => 'Incorrect password.']);
+        exit();
+    }
+
     if (!isset($data['room_name']) || !isset($data['sensor_ids'])) {
         echo json_encode(['status' => 'error', 'message' => 'Missing parameters']);
         return;
@@ -58,22 +65,24 @@ function deleteRoom() {
     global $conn;
     $data = json_decode(file_get_contents('php://input'), true);
 
-    if (!isset($data['room_id']) || empty(trim($data['room_id']))) {
-        echo json_encode(['status' => 'error', 'message' => 'Room ID is required']);
+     
+
+    if (!isset($data['room_name']) || empty(trim($data['room_name']))) {
+        echo json_encode(['status' => 'error', 'message' => 'Room name is required']);
         exit();
     }
 
-    $room_id = intval($data['room_id']);
+    $room_name = trim($data['room_name']);
 
-    // Get room name for logging/confirmation (optional)
-    $stmt = mysqli_prepare($conn, "SELECT room_name FROM rooms WHERE room_id = ?");
-    mysqli_stmt_bind_param($stmt, "i", $room_id);
+    // Get room_id from room_name
+    $stmt = mysqli_prepare($conn, "SELECT room_id FROM rooms WHERE room_name = ?");
+    mysqli_stmt_bind_param($stmt, "s", $room_name);
     mysqli_stmt_execute($stmt);
-    mysqli_stmt_bind_result($stmt, $room_name);
+    mysqli_stmt_bind_result($stmt, $room_id);
     mysqli_stmt_fetch($stmt);
     mysqli_stmt_close($stmt);
 
-    if (!$room_name) {
+    if (!$room_id) {
         echo json_encode(['status' => 'error', 'message' => 'Room not found']);
         exit();
     }
@@ -91,6 +100,7 @@ function deleteRoom() {
 
     mysqli_begin_transaction($conn);
     try {
+        // Delete all sensor readings
         if (!empty($sensor_ids)) {
             foreach ($sensor_ids as $sid) {
                 $del_reading = mysqli_prepare($conn, "DELETE FROM sensor_readings WHERE sensor_id = ?");
@@ -100,20 +110,17 @@ function deleteRoom() {
             }
         }
 
-        $del_room = mysqli_prepare($conn, "DELETE FROM rooms WHERE room_id = ?");
-        mysqli_stmt_bind_param($del_room, "i", $room_id);
-        mysqli_stmt_execute($del_room);
-        mysqli_stmt_close($del_room);
-
-        $del_agg = mysqli_prepare($conn, "DELETE FROM daily_aggregates WHERE room_id = ?");
-        mysqli_stmt_bind_param($del_agg, "i", $room_id);
-        mysqli_stmt_execute($del_agg);
-        mysqli_stmt_close($del_agg);
-
+        // Delete sensors
         $del_sensors = mysqli_prepare($conn, "DELETE FROM sensors WHERE room_id = ?");
         mysqli_stmt_bind_param($del_sensors, "i", $room_id);
         mysqli_stmt_execute($del_sensors);
         mysqli_stmt_close($del_sensors);
+
+        // Delete the room
+        $del_room = mysqli_prepare($conn, "DELETE FROM rooms WHERE room_id = ?");
+        mysqli_stmt_bind_param($del_room, "i", $room_id);
+        mysqli_stmt_execute($del_room);
+        mysqli_stmt_close($del_room);
 
         mysqli_commit($conn);
         echo json_encode(['status' => 'success', 'message' => "Room '$room_name' and its data deleted successfully"]);
@@ -122,6 +129,7 @@ function deleteRoom() {
         echo json_encode(['status' => 'error', 'message' => 'Error deleting room: ' . $e->getMessage()]);
     }
 }
+
 
 
 
